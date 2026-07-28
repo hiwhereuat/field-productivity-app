@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Button, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Button, Alert, Image } from 'react-native';
 import { useTasks } from '../context/TaskContext';
 import { useTheme } from '../context/ThemeContext';
 import { TaskStatus } from '../types/task';
@@ -83,6 +83,18 @@ const TaskDetailScreen = ({ route, navigation }: any) => {
         <Button title="Delete" color={theme.error} onPress={deleteTask} />
       </View>
 
+      <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 24 }]}>Attachments</Text>
+      {task.attachments.length === 0 ? (
+        <Text style={{ color: theme.text }}>No attachments</Text>
+      ) : (
+        task.attachments.map(att => (
+          <View key={att.id} style={styles.attachmentItem}>
+            <Image source={{ uri: att.uri }} style={styles.image} />
+            <Text style={{ color: theme.text, marginTop: 4 }}>{att.name}</Text>
+          </View>
+        ))
+      )}
+
       <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 24 }]}>History</Text>
       {taskHistory.length === 0 ? (
         <Text style={{ color: theme.text }}>No history entries</Text>
@@ -116,6 +128,8 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     backgroundColor: 'rgba(0,0,0,0.03)',
   },
+  attachmentItem: { marginBottom: 16 },
+  image: { width: '100%', height: 200, borderRadius: 8, resizeMode: 'cover' },
 });
 
 export default TaskDetailScreen;

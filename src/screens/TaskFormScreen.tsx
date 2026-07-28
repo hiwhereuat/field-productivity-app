@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, Button, StyleSheet, ScrollView, Platform,
+  View, Text, TextInput, Button, StyleSheet, ScrollView, Platform, Image, Alert,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { useTasks } from '../context/TaskContext';
 import { validateTask } from '../utils/validation';
-import { Task, TaskStatus } from '../types/task';
+import { Task, TaskStatus, Attachment } from '../types/task';
+import { saveAttachment, deleteAttachment as deleteFile } from '../services/fileService';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -26,6 +28,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
   const [address, setAddress] = useState(existingTask?.address ?? '');
   const [latitude, setLatitude] = useState(existingTask?.latitude?.toString() ?? '');
   const [longitude, setLongitude] = useState(existingTask?.longitude?.toString() ?? '');
+  const [attachments, setAttachments] = useState<Attachment[]>(existingTask?.attachments ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDatePickerIOS, setShowDatePickerIOS] = useState(false);
 
@@ -60,6 +63,39 @@ const TaskFormScreen = ({ navigation, route }: any) => {
     });
   };
 
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Allow access to photos to attach images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.length) {
+      const asset = result.assets[0];
+      try {
+        const saved = await saveAttachment(asset.uri, asset.fileName ?? 'image.jpg');
+        const newAtt: Attachment = {
+          id: saved.id,
+          uri: saved.uri,
+          type: asset.mimeType ?? 'image/jpeg',
+          name: asset.fileName ?? 'image.jpg',
+        };
+        setAttachments(prev => [...prev, newAtt]);
+      } catch (err) {
+        Alert.alert('Error', 'Failed to save attachment');
+      }
+    }
+  };
+
+  const removeAttachment = async (att: Attachment) => {
+    await deleteFile(att.uri);
+    setAttachments(prev => prev.filter(a => a.id !== att.id));
+  };
+
   const handleSave = () => {
     if (typeof dispatch !== 'function') {
       console.warn('dispatch is not a function');
@@ -75,6 +111,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
       address,
       latitude: latitude ? parseFloat(latitude) : undefined,
       longitude: longitude ? parseFloat(longitude) : undefined,
+      attachments,
     };
 
     const validationErrors = validateTask(taskData);
@@ -85,6 +122,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
 
     try {
       if (existingTask) {
+        const oldAttachments = existingTask.attachments || [];
         const updated: Task = {
           ...existingTask,
           title: title.trim(),
@@ -93,10 +131,16 @@ const TaskFormScreen = ({ navigation, route }: any) => {
           address: address.trim(),
           latitude: taskData.latitude,
           longitude: taskData.longitude,
+          attachments,
           updatedAt: new Date().toISOString(),
         };
         dispatch({ type: 'UPDATE_TASK', payload: updated });
         addLogEntry('EDIT', 'Task details updated', updated.id, updated.title);
+        if (JSON.stringify(oldAttachments) !== JSON.stringify(attachments)) {
+          setTimeout(() => {
+            addLogEntry('ATTACHMENTS', 'Attachments updated', updated.id, updated.title);
+          }, 0);
+        }
       } else {
         const now = new Date().toISOString();
         const newTask: Task = {
@@ -108,13 +152,18 @@ const TaskFormScreen = ({ navigation, route }: any) => {
           latitude: taskData.latitude,
           longitude: taskData.longitude,
           status: 'New' as TaskStatus,
-          attachments: [],
+          attachments,
           createdAt: now,
           updatedAt: now,
           syncStatus: 'pending',
         };
         dispatch({ type: 'ADD_TASK', payload: newTask });
         addLogEntry('CREATE', 'Task created', newTask.id, newTask.title);
+        if (attachments.length > 0) {
+          setTimeout(() => {
+            addLogEntry('ATTACHMENTS', `Added ${attachments.length} attachment(s)`, newTask.id, newTask.title);
+          }, 0);
+        }
       }
       navigation.goBack();
     } catch (error) {
@@ -176,6 +225,18 @@ const TaskFormScreen = ({ navigation, route }: any) => {
         placeholder="Lon" placeholderTextColor={theme.border}
       />
 
+      <Text style={[styles.label, { color: theme.text }]}>Attachments</Text>
+      {attachments.map((att, index) => (
+        <View key={att.id} style={styles.attachmentRow}>
+          <Image source={{ uri: att.uri }} style={styles.thumbnail} />
+          <Text style={{ color: theme.text, flex: 1, marginLeft: 8 }} numberOfLines={1}>
+            {att.name}
+          </Text>
+          <Button title="Remove" onPress={() => removeAttachment(att)} color={theme.error} />
+        </View>
+      ))}
+      <Button title="Add Image" onPress={pickImage} />
+
       <Button title={existingTask ? 'Update Task' : 'Create Task'} onPress={handleSave} />
     </ScrollView>
   );
@@ -185,6 +246,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   label: { marginTop: 12, marginBottom: 4, fontWeight: '600' },
   input: { borderWidth: 1, borderRadius: 6, padding: 10, marginBottom: 4 },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  thumbnail: { width: 40, height: 40, borderRadius: 4, marginRight: 8 },
 });
 
 export default TaskFormScreen;
