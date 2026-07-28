@@ -10,6 +10,7 @@ import { useTasks } from '../context/TaskContext';
 import { validateTask } from '../utils/validation';
 import { Task, TaskStatus, Attachment } from '../types/task';
 import { saveAttachment, deleteAttachment as deleteFile } from '../services/fileService';
+import { scheduleTaskReminder, requestPermissions } from '../services/notificationService';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -136,6 +137,17 @@ const TaskFormScreen = ({ navigation, route }: any) => {
       return;
     }
 
+    const scheduleReminder = async (task: Task) => {
+      const granted = await requestPermissions();
+      if (granted) {
+        const notifId = await scheduleTaskReminder(task.id, task.title, task.dueDate);
+        if (notifId) {
+          const updatedTask = { ...task, notificationId: notifId };
+          dispatch({ type: 'UPDATE_TASK', payload: updatedTask });
+        }
+      }
+    };
+
     try {
       if (existingTask) {
         const oldAttachments = existingTask.attachments || [];
@@ -157,6 +169,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
             addLogEntry('ATTACHMENTS', 'Attachments updated', updated.id, updated.title);
           }, 0);
         }
+        scheduleReminder(updated);
       } else {
         const now = new Date().toISOString();
         const newTask: Task = {
@@ -180,6 +193,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
             addLogEntry('ATTACHMENTS', `Added ${attachments.length} attachment(s)`, newTask.id, newTask.title);
           }, 0);
         }
+        scheduleReminder(newTask);
       }
       navigation.goBack();
     } catch (error) {

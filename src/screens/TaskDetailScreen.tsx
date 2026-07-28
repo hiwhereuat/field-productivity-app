@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Button, Alert, Image } from 'react-
 import { useTasks } from '../context/TaskContext';
 import { useTheme } from '../context/ThemeContext';
 import { TaskStatus } from '../types/task';
+import { cancelNotification } from '../services/notificationService';
 
 const statusFlow: Record<TaskStatus, TaskStatus[]> = {
   New: ['InProgress', 'Cancelled'],
@@ -45,7 +46,10 @@ const TaskDetailScreen = ({ route, navigation }: any) => {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          if (task.notificationId) {
+            await cancelNotification(task.notificationId);
+          }
           addLogEntry('DELETE', `Task "${task.title}" deleted`, task.id, task.title);
           dispatch({ type: 'DELETE_TASK', payload: task.id });
           navigation.goBack();

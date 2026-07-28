@@ -9,6 +9,7 @@ import TaskFormScreen from './src/screens/TaskFormScreen';
 import TaskDetailScreen from './src/screens/TaskDetailScreen';
 import MapScreen from './src/screens/MapScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -30,6 +31,7 @@ export default function App() {
             <Tab.Screen name="TasksTab" component={TasksStack} options={{ tabBarLabel: 'Tasks' }} />
             <Tab.Screen name="Map" component={MapScreen} />
             <Tab.Screen name="History" component={HistoryScreen} />
+            <Tab.Screen name="Settings" component={SettingsScreen} />
           </Tab.Navigator>
         </NavigationContainer>
       </TaskProvider>
