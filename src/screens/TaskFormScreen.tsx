@@ -14,7 +14,7 @@ const generateId = () => {
 
 const TaskFormScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
-  const { dispatch, state } = useTasks();
+  const { dispatch, state, addLogEntry } = useTasks();
   const taskId = route.params?.taskId;
   const existingTask = taskId ? state.tasks.find(t => t.id === taskId) : null;
 
@@ -96,6 +96,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
           updatedAt: new Date().toISOString(),
         };
         dispatch({ type: 'UPDATE_TASK', payload: updated });
+        addLogEntry('EDIT', 'Task details updated', updated.id, updated.title);
       } else {
         const now = new Date().toISOString();
         const newTask: Task = {
@@ -108,12 +109,12 @@ const TaskFormScreen = ({ navigation, route }: any) => {
           longitude: taskData.longitude,
           status: 'New' as TaskStatus,
           attachments: [],
-          history: [],
           createdAt: now,
           updatedAt: now,
           syncStatus: 'pending',
         };
         dispatch({ type: 'ADD_TASK', payload: newTask });
+        addLogEntry('CREATE', 'Task created', newTask.id, newTask.title);
       }
       navigation.goBack();
     } catch (error) {

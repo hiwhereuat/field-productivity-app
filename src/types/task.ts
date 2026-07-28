@@ -13,6 +13,8 @@ export interface HistoryEntry {
   timestamp: string;
   action: string;
   description: string;
+  taskId: string;
+  taskTitle: string;
 }
 
 export interface Task {
@@ -25,7 +27,6 @@ export interface Task {
   longitude?: number;
   status: TaskStatus;
   attachments: Attachment[];
-  history: HistoryEntry[];
   createdAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
