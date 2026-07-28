@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useTheme } from '../context/ThemeContext';
 import { useTasks } from '../context/TaskContext';
 import { validateTask } from '../utils/validation';
@@ -94,6 +95,21 @@ const TaskFormScreen = ({ navigation, route }: any) => {
   const removeAttachment = async (att: Attachment) => {
     await deleteFile(att.uri);
     setAttachments(prev => prev.filter(a => a.id !== att.id));
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required to get coordinates.');
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setLatitude(loc.coords.latitude.toString());
+      setLongitude(loc.coords.longitude.toString());
+    } catch (error) {
+      Alert.alert('Error', 'Could not fetch location. Ensure GPS is enabled.');
+    }
   };
 
   const handleSave = () => {
@@ -224,6 +240,7 @@ const TaskFormScreen = ({ navigation, route }: any) => {
         value={longitude} onChangeText={setLongitude} keyboardType="numeric"
         placeholder="Lon" placeholderTextColor={theme.border}
       />
+      <Button title="Use current location" onPress={getCurrentLocation} />
 
       <Text style={[styles.label, { color: theme.text }]}>Attachments</Text>
       {attachments.map((att, index) => (
