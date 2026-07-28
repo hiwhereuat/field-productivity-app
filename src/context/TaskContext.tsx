@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { Task, HistoryEntry } from '../types/task';
 import { getTasks, saveTasks } from '../services/taskStorage';
 import { getGlobalHistory, saveGlobalHistory } from '../services/globalHistoryStorage';
 import { createHistoryEntry } from '../utils/history';
+import { performSync } from '../services/syncEngine';
 
 interface State {
   tasks: Task[];
@@ -46,10 +49,7 @@ function reducer(state: State, action: Action): State {
         tasks: state.tasks.map(t => (t.id === action.payload.id ? action.payload : t)),
       };
     case 'DELETE_TASK':
-      return {
-        ...state,
-        tasks: state.tasks.filter(t => t.id !== action.payload),
-      };
+      return { ...state, tasks: state.tasks.filter(t => t.id !== action.payload) };
     case 'SET_SORT':
       return { ...state, sortBy: action.payload };
     case 'SET_GLOBAL_HISTORY':
@@ -65,7 +65,8 @@ const TaskContext = createContext<{
   state: State;
   dispatch: React.Dispatch<Action>;
   addLogEntry: (action: string, description: string, taskId: string, taskTitle: string) => void;
-}>({ state: initialState, dispatch: () => {}, addLogEntry: () => {} });
+  syncNow: () => Promise<void>;
+}>({ state: initialState, dispatch: () => {}, addLogEntry: () => {}, syncNow: async () => {} });
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -83,10 +84,34 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveGlobalHistory(state.globalHistory);
   }, [state.globalHistory]);
 
-  const addLogEntry = (action: string, description: string, taskId: string, taskTitle: string) => {
-    const entry = createHistoryEntry(action, description, taskId, taskTitle);
-    dispatch({ type: 'ADD_GLOBAL_HISTORY', payload: entry });
-  };
+  const addLogEntry = useCallback(
+    (action: string, description: string, taskId: string, taskTitle: string) => {
+      const entry = createHistoryEntry(action, description, taskId, taskTitle);
+      dispatch({ type: 'ADD_GLOBAL_HISTORY', payload: entry });
+    },
+    []
+  );
+
+  const syncNow = useCallback(async () => {
+    try {
+      const { tasks, historyEntries } = await performSync();
+      dispatch({ type: 'SET_TASKS', payload: tasks });
+      historyEntries.forEach(entry => {
+        dispatch({ type: 'ADD_GLOBAL_HISTORY', payload: entry });
+      });
+    } catch (error) {
+      console.warn('Sync failed', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected) {
+        syncNow();
+      }
+    });
+    return () => unsubscribe();
+  }, [syncNow]);
 
   const displayState: State = {
     ...state,
@@ -94,7 +119,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <TaskContext.Provider value={{ state: displayState, dispatch, addLogEntry }}>
+    <TaskContext.Provider value={{ state: displayState, dispatch, addLogEntry, syncNow }}>
       {children}
     </TaskContext.Provider>
   );

@@ -26,9 +26,33 @@ const TaskListScreen = ({ navigation }: any) => {
               style={[styles.item, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
             >
-              <Text style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-              <Text style={{ color: theme.text }}>Due: {new Date(item.dueDate).toLocaleString()}</Text>
-              <Text style={{ color: theme.text }} numberOfLines={1}>{item.address}</Text>
+              <View style={styles.row}>
+                <Text style={[styles.title, { color: theme.text, flex: 1 }]}>{item.title}</Text>
+                <View style={styles.syncContainer}>
+                  <View
+                    style={[
+                      styles.syncDot,
+                      {
+                        backgroundColor:
+                          item.syncStatus === 'synced'
+                            ? theme.success
+                            : item.syncStatus === 'pending'
+                            ? theme.warning
+                            : theme.error,
+                      },
+                    ]}
+                  />
+                  <Text style={[styles.syncText, { color: theme.text }]}>
+                    {item.syncStatus}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ color: theme.text }}>
+                Due: {new Date(item.dueDate).toLocaleString()}
+              </Text>
+              <Text style={{ color: theme.text }} numberOfLines={1}>
+                {item.address}
+              </Text>
               <Text style={{ color: theme.primary }}>{item.status}</Text>
             </TouchableOpacity>
           )}
@@ -51,6 +75,10 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
   item: { padding: 16, marginBottom: 8, borderRadius: 8, borderWidth: 1 },
   title: { fontWeight: 'bold', marginBottom: 4 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  syncContainer: { flexDirection: 'row', alignItems: 'center' },
+  syncDot: { width: 10, height: 10, borderRadius: 5, marginRight: 4 },
+  syncText: { fontSize: 12 },
   fab: { position: 'absolute', right: 24, bottom: 24, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   fabText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
 });
