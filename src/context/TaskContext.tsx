@@ -11,9 +11,10 @@ interface State {
   tasks: Task[];
   sortBy: 'createdAt' | 'dueDate' | 'status';
   globalHistory: HistoryEntry[];
+  loading: boolean;
 }
 
-const initialState: State = { tasks: [], sortBy: 'createdAt', globalHistory: [] };
+const initialState: State = { tasks: [], sortBy: 'createdAt', globalHistory: [], loading: true };
 
 type Action =
   | { type: 'SET_TASKS'; payload: Task[] }
@@ -22,7 +23,8 @@ type Action =
   | { type: 'DELETE_TASK'; payload: string }
   | { type: 'SET_SORT'; payload: State['sortBy'] }
   | { type: 'SET_GLOBAL_HISTORY'; payload: HistoryEntry[] }
-  | { type: 'ADD_GLOBAL_HISTORY'; payload: HistoryEntry };
+  | { type: 'ADD_GLOBAL_HISTORY'; payload: HistoryEntry }
+  | { type: 'SET_LOADING'; payload: boolean };
 
 function sortTasks(tasks: Task[], sortBy: State['sortBy']): Task[] {
   const sorted = [...tasks];
@@ -56,6 +58,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, globalHistory: action.payload };
     case 'ADD_GLOBAL_HISTORY':
       return { ...state, globalHistory: [...state.globalHistory, action.payload] };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
     default:
       return state;
   }
@@ -66,14 +70,24 @@ const TaskContext = createContext<{
   dispatch: React.Dispatch<Action>;
   addLogEntry: (action: string, description: string, taskId: string, taskTitle: string) => void;
   syncNow: () => Promise<void>;
-}>({ state: initialState, dispatch: () => {}, addLogEntry: () => {}, syncNow: async () => {} });
+  loading: boolean;
+}>({
+  state: initialState,
+  dispatch: () => {},
+  addLogEntry: () => {},
+  syncNow: async () => {},
+  loading: true,
+});
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    getTasks().then(tasks => dispatch({ type: 'SET_TASKS', payload: tasks }));
-    getGlobalHistory().then(history => dispatch({ type: 'SET_GLOBAL_HISTORY', payload: history }));
+    Promise.all([getTasks(), getGlobalHistory()]).then(([tasks, history]) => {
+      dispatch({ type: 'SET_TASKS', payload: tasks });
+      dispatch({ type: 'SET_GLOBAL_HISTORY', payload: history });
+      dispatch({ type: 'SET_LOADING', payload: false });
+    });
   }, []);
 
   useEffect(() => {
@@ -105,8 +119,8 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected) {
+    const unsubscribe = NetInfo.addEventListener(netState => {
+      if (netState.isConnected) {
         syncNow();
       }
     });
@@ -119,7 +133,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <TaskContext.Provider value={{ state: displayState, dispatch, addLogEntry, syncNow }}>
+    <TaskContext.Provider value={{ state: displayState, dispatch, addLogEntry, syncNow, loading: state.loading }}>
       {children}
     </TaskContext.Provider>
   );

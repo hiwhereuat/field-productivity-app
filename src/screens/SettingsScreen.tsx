@@ -6,7 +6,7 @@ import { requestPermissions, scheduleDemoNotification } from '../services/notifi
 
 const SettingsScreen = () => {
   const { theme, isDark, toggleTheme } = useTheme();
-  const { state } = useTasks();
+  const { state, syncNow } = useTasks();
 
   const triggerDemo = async () => {
     if (state.tasks.length === 0) {
@@ -21,12 +21,24 @@ const SettingsScreen = () => {
     }
   };
 
+  const handleSync = async () => {
+    try {
+      await syncNow();
+      Alert.alert('Sync complete', 'Local data synchronized with server.');
+    } catch {
+      Alert.alert('Sync failed', 'Could not synchronize. Check server and network.');
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Text style={[styles.text, { color: theme.text }]}>Candidate Code: SA-RN-1234</Text>
       <Button title={`Theme: ${isDark ? 'Dark' : 'Light'}`} onPress={toggleTheme} />
       <View style={{ marginTop: 20 }}>
         <Button title="Test Notification (30s)" onPress={triggerDemo} />
+      </View>
+      <View style={{ marginTop: 20 }}>
+        <Button title="Sync Now" onPress={handleSync} />
       </View>
     </View>
   );
