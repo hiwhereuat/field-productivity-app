@@ -69,7 +69,7 @@ const TaskContext = createContext<{
   state: State;
   dispatch: React.Dispatch<Action>;
   addLogEntry: (action: string, description: string, taskId: string, taskTitle: string) => void;
-  syncNow: () => Promise<void>;
+  syncNow: (throwOnError?: boolean) => Promise<void>;
   loading: boolean;
 }>({
   state: initialState,
@@ -87,6 +87,11 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'SET_TASKS', payload: tasks });
       dispatch({ type: 'SET_GLOBAL_HISTORY', payload: history });
       dispatch({ type: 'SET_LOADING', payload: false });
+      NetInfo.fetch().then(netState => {
+        if (netState.isConnected) {
+          syncNow();
+        }
+      });
     });
   }, []);
 
@@ -106,7 +111,7 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     []
   );
 
-  const syncNow = useCallback(async () => {
+  const syncNow = useCallback(async (throwOnError = false) => {
     try {
       const { tasks, historyEntries } = await performSync();
       dispatch({ type: 'SET_TASKS', payload: tasks });
@@ -115,6 +120,9 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.warn('Sync failed', error);
+      if (throwOnError) {
+        throw error;
+      }
     }
   }, []);
 

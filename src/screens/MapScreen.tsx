@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Text, Platform } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useTasks } from '../context/TaskContext';
 import { useTheme } from '../context/ThemeContext';
@@ -13,6 +13,13 @@ const MapScreen = () => {
   const tasksWithCoords = state.tasks.filter(
     t => t.latitude != null && t.longitude != null && !isNaN(t.latitude) && !isNaN(t.longitude)
   );
+
+  const openTaskDetail = (taskId: string) => {
+    navigation.navigate('TasksTab', {
+      screen: 'TaskDetail',
+      params: { taskId },
+    });
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -36,18 +43,14 @@ const MapScreen = () => {
             title={task.title}
             description={task.status}
           >
-            <Callout
-              onPress={() =>
-                navigation.navigate('TasksTab', {
-                  screen: 'TaskDetail',
-                  params: { taskId: task.id },
-                })
-              }
-            >
+            <Callout onPress={() => openTaskDetail(task.id)}>
               <View style={styles.callout}>
                 <Text style={{ fontWeight: 'bold' }}>{task.title}</Text>
                 <Text>{task.address}</Text>
                 <Text style={{ color: theme.primary }}>{task.status}</Text>
+                <Text style={{ fontSize: 12, marginTop: 4, color: theme.primary }}>
+                  Tap to view details
+                </Text>
               </View>
             </Callout>
           </Marker>

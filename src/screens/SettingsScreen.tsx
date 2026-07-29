@@ -23,7 +23,7 @@ const SettingsScreen = () => {
 
   const handleSync = async () => {
     try {
-      await syncNow();
+      await syncNow(true);
       Alert.alert('Sync complete', 'Local data synchronized with server.');
     } catch {
       Alert.alert('Sync failed', 'Could not synchronize. Check server and network.');

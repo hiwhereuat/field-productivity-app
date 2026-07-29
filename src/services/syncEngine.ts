@@ -1,6 +1,6 @@
 import { Task, HistoryEntry } from '../types/task';
-import { getTasks, saveTasks } from './taskStorage';
-import { fetchRemoteTasks, uploadTask, updateRemoteTask } from '../api/syncService';
+import { getTasks, saveTasks, getDeletedTasksInfo, clearDeletedTasksInfo } from './taskStorage';
+import { fetchRemoteTasks, uploadTask, updateRemoteTask, deleteRemoteTask } from '../api/syncService';
 import { createHistoryEntry } from '../utils/history';
 
 async function reconcile(localTasks: Task[], remoteTasks: Task[]): Promise<Task[]> {
@@ -28,25 +28,50 @@ export async function performSync(): Promise<{
   historyEntries: HistoryEntry[];
 }> {
   const localTasks = await getTasks();
-  const remoteTasks = await fetchRemoteTasks();
-  const reconciled = await reconcile(localTasks, remoteTasks);
+  const deletedInfos = await getDeletedTasksInfo();
+  let remoteTasks: Task[] = [];
+
+  try {
+    remoteTasks = await fetchRemoteTasks();
+  } catch {
+    return { tasks: localTasks, historyEntries: [] };
+  }
+
+  for (const info of deletedInfos) {
+    if (info.remoteId) {
+      try {
+        await deleteRemoteTask(info.remoteId);
+      } catch (e) {
+        console.warn('Failed to delete remote task', info.remoteId, e);
+      }
+    }
+  }
+
+  const deletedLocalIds = new Set(deletedInfos.map(d => d.taskId));
+  const filteredRemote = remoteTasks.filter(t => {
+    const localId = (t as any).localId;
+    return !deletedLocalIds.has(t.id) && !deletedLocalIds.has(localId);
+  });
+
+  const reconciled = await reconcile(localTasks, filteredRemote);
   const historyEntries: HistoryEntry[] = [];
 
-  for (let task of reconciled) {
+  for (let i = 0; i < reconciled.length; i++) {
+    const task = reconciled[i];
     if (task.syncStatus === 'pending' || task.syncStatus === 'failed') {
       try {
         if (task.remoteId) {
           await updateRemoteTask(task);
-          task = { ...task, syncStatus: 'synced' };
+          reconciled[i] = { ...task, syncStatus: 'synced' };
         } else {
           const remote = await uploadTask(task);
-          task = { ...task, remoteId: remote.id, syncStatus: 'synced' };
+          reconciled[i] = { ...task, remoteId: remote.id, syncStatus: 'synced' };
         }
         historyEntries.push(
           createHistoryEntry('SYNC', `Task "${task.title}" synced`, task.id, task.title)
         );
       } catch {
-        task = { ...task, syncStatus: 'failed' };
+        reconciled[i] = { ...task, syncStatus: 'failed' };
         historyEntries.push(
           createHistoryEntry('SYNC_FAILED', `Sync failed for "${task.title}"`, task.id, task.title)
         );
@@ -55,5 +80,6 @@ export async function performSync(): Promise<{
   }
 
   await saveTasks(reconciled);
+  await clearDeletedTasksInfo();
   return { tasks: reconciled, historyEntries };
 }
